@@ -387,18 +387,7 @@ function nnz(lu::UmfpackLU)
 end
 
 ### Solve with Factorization
-ldiv!(lu::UmfpackLU{T}, B::StridedVecOrMat{T}) where {T<:UMFVTypes} =
-    ldiv!(B, lu, copy(B))
-ldiv!(translu::Transpose{T,<:UmfpackLU{T}}, B::StridedVecOrMat{T}) where {T<:UMFVTypes} =
-    (lu = translu.parent; ldiv!(B, transpose(lu), copy(B)))
-ldiv!(adjlu::Adjoint{T,<:UmfpackLU{T}}, B::StridedVecOrMat{T}) where {T<:UMFVTypes} =
-    (lu = adjlu.parent; ldiv!(B, adjoint(lu), copy(B)))
-ldiv!(lu::UmfpackLU{Float64}, B::StridedVecOrMat{<:Complex}) =
-    ldiv!(B, lu, copy(B))
-ldiv!(translu::Transpose{Float64,<:UmfpackLU{Float64}}, B::StridedVecOrMat{<:Complex}) =
-    (lu = translu.parent; ldiv!(B, transpose(lu), copy(B)))
-ldiv!(adjlu::Adjoint{Float64,<:UmfpackLU{Float64}}, B::StridedVecOrMat{<:Complex}) =
-    (lu = adjlu.parent; ldiv!(B, adjoint(lu), copy(B)))
+import Base.LinAlg.ldiv!
 
 ldiv!(X::StridedVecOrMat{T}, lu::UmfpackLU{T}, B::StridedVecOrMat{T}) where {T<:UMFVTypes} =
     _Aq_ldiv_B!(X, lu, B, UMFPACK_A)
