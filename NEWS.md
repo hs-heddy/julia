@@ -367,11 +367,12 @@ This section lists changes that do not have deprecation warnings.
   * `findn(x::AbstractArray)` has been deprecated in favor of `find(!iszero, x)`, which
     now returns cartesian indices for multidimensional arrays (see below, [#25532]).
 
-  * `find` now returns the same type of indices as `keys`/`pairs` for `AbstractArray`,
+  * `find`, `findfirst`, `findlast`, `findnext` and `findprev` now take and/or return
+    the same type of indices as `keys`/`pairs` for `AbstractArray`,
     `AbstractDict`, `AbstractString`, `Tuple` and `NamedTuple` objects ([#24774]).
-    In particular, this means that it returns `CartesianIndex` objects for matrices
+    In particular, this means that they return `CartesianIndex` objects for matrices
     and higher-dimensional arrays instead of linear indices as was previously the case.
-    Use `LinearIndices(a)[find(f, a)]` to compute linear indices.
+    Use `LinearIndices(a)[find(f, a)]` and similar constructs to compute linear indices.
 
  * `AbstractSet` objects are now considered equal by `==` and `isequal` if all of their
     elements are equal ([#25368]). This has required changing the hashing algorithm
