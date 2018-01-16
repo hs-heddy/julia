@@ -134,5 +134,42 @@ push!(LOAD_PATH, "project")
     end
 end
 
+@testset "project & manifest import" begin
+    @test !@isdefined Foo
+    @test !@isdefined Bar
+    import Foo
+    @test @isdefined Foo
+    @test !@isdefined Bar
+    import Bar
+    @test @isdefined Foo
+    @test @isdefined Bar
+
+    @testset "module graph structure" begin
+        local classes = Dict(
+            "Foo1" => [Foo],
+            "Bar"  => [Bar, Foo.Bar],
+            "Baz"  => [Foo.Baz, Bar.Baz, Foo.Bar.Baz],
+            "Foo2" => [Bar.Foo, Foo.Bar.Foo, Foo.Baz.Foo, Bar.Baz.Foo],
+            "Qux"  => [Foo.Qux, Foo.Baz.Qux, Bar.Baz.Qux, Foo.Bar.Foo.Qux,
+                       Bar.Foo.Qux, Foo.Baz.Foo.Qux, Bar.Baz.Foo.Qux,
+                       Foo.Bar.Baz.Foo.Qux],
+        )
+        for (i, (this, mods)) in enumerate(classes)
+            for x in mods
+                @test x.this == this
+                for y in mods
+                    @test x === y
+                end
+                for (j, (that, mods′)) in enumerate(classes)
+                    i == j && continue
+                    for z in mods′
+                        @test x !== z
+                    end
+                end
+            end
+        end
+    end
+end
+
 empty!(LOAD_PATH)
 append!(LOAD_PATH, saved_load_path)
