@@ -317,9 +317,9 @@ function manifest_deps_get(env::String, where::PkgId, name::String)::Union{Bool,
     if isdir(env)
         return implicit_manifest_deps_get(env, where, name)
     elseif basename(env) in project_names && isfile_casesensitive(env)
-        env = project_file_manifest_path(env)
-        if isfile_casesensitive(env)
-            return explicit_manifest_deps_get(env, where.uuid, name)
+        manifest_file = project_file_manifest_path(env)
+        if isfile_casesensitive(manifest_file)
+            return explicit_manifest_deps_get(manifest_file, where.uuid, name)
         end
     end
     return false
@@ -329,9 +329,9 @@ function manifest_uuid_path(env::String, pkg::PkgId)::Union{Nothing,String}
     if isdir(env)
         return implicit_manifest_uuid_path(env, pkg)
     elseif basename(env) in project_names && isfile_casesensitive(env)
-        env = project_file_manifest_path(env)
-        if isfile_casesensitive(env)
-            return explicit_manifest_uuid_path(env, pkg)
+        manifest_file = project_file_manifest_path(env)
+        if isfile_casesensitive(manifest_file)
+            return explicit_manifest_uuid_path(manifest_file, pkg)
         end
     end
     return nothing
@@ -380,43 +380,6 @@ function project_file_manifest_path(project_file::String)::Union{Nothing,String}
         end
         return manifest_file
     end
-end
-
-# find manifest file's `where` stanza's deps
-function manifest_file_deps(manifest_file::AbstractString, where::UUID, io::IO)::Union{Nothing,Vector{String},Dict{String,UUID}}
-    deps = nothing
-    found = in_deps = false
-    for line in eachline(io)
-        if !in_deps
-            if contains(line, re_array_of_tables)
-                found && break
-                deps = nothing
-                found = false
-            elseif (m = match(re_uuid_to_string, line)) != nothing
-                found = (where == UUID(m.captures[1]))
-            elseif (m = match(re_deps_to_any, line)) != nothing
-                deps = String(m.captures[1])
-            elseif contains(line, re_subsection_deps)
-                deps = Dict{String,UUID}()
-                in_deps = true
-            end
-        else # in_deps
-            if (m = match(re_key_to_string, line)) != nothing
-                deps[m.captures[1]] = UUID(m.captures[2])
-            elseif contains(line, re_section)
-                found && break
-                in_deps = false
-            end
-        end
-    end
-    found || return nothing
-    deps isa String || return deps
-    # TODO: handle inline table syntax
-    if deps[1] != '[' || deps[end] != ']'
-        @warn "Unexpected TOML deps format:\n$deps"
-        return nothing
-    end
-    return map(m->String(m.captures[1]), eachmatch(r"\"(.*?)\"", deps))
 end
 
 # find `name` in a manifest file and return its UUID
@@ -501,17 +464,40 @@ end
 #  - `uuid` means: found `where` and `name` mapped to `uuid` in its deps
 
 function explicit_manifest_deps_get(manifest_file::String, where::UUID, name::String)::Union{Bool,UUID}
+    uuid = deps = nothing
+    state = :other
     open(manifest_file) do io
-        deps = manifest_file_deps(manifest_file, where, io)
-        deps == nothing && return false
-        if deps isa Dict
-            haskey(deps, name) || return true
-            return deps[name]::UUID
+        for line in eachline(io)
+            if contains(line, re_array_of_tables)
+                uuid == where && break
+                uuid = deps = nothing
+                state = :stanza
+            elseif state == :stanza
+                if (m = match(re_uuid_to_string, line)) != nothing
+                    uuid = UUID(m.captures[1])
+                elseif (m = match(re_deps_to_any, line)) != nothing
+                    deps = String(m.captures[1])
+                elseif contains(line, re_subsection_deps)
+                    state = :deps
+                elseif contains(line, re_section)
+                    state = :other
+                end
+            elseif state == :deps && uuid == where
+                if (m = match(re_key_to_string, line)) != nothing
+                    m.captures[1] == name && return UUID(m.captures[2])
+                end
+            end
         end
-        deps :: Vector
-        name in deps || return true
+        uuid == where || return false
+        deps == nothing && return true
+        # TODO: handle inline table syntax
+        if deps[1] != '[' || deps[end] != ']'
+            @warn "Unexpected TOML deps format:\n$deps"
+            return nothing
+        end
+        contains(deps, repr(name)) || return true
         seekstart(io) # rewind IO handle
-        return manifest_file_name_uuid(manifest_file, name, io)
+        manifest_file_name_uuid(manifest_file, name, io)
     end
 end
 

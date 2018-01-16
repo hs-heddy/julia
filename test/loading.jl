@@ -81,11 +81,12 @@ end
 
 import Base.Random: UUID
 
-@testset "project & manifest find_package" begin
-    saved_load_path = copy(LOAD_PATH)
-    empty!(LOAD_PATH)
-    push!(LOAD_PATH, "project")
-    @test Base.load_path() == [abspath("project","Project.toml")]
+saved_load_path = copy(LOAD_PATH)
+empty!(LOAD_PATH)
+push!(LOAD_PATH, "project")
+@test Base.load_path() == [abspath("project","Project.toml")]
+
+@testset "project & manifest identify_package & locate_package" begin
     local path
     for (names, path, uuid) in [
         ("Foo",     "Foo1/src/Foo.jl",    "767738be-2f1f-45a9-b806-0234f3164144"),
@@ -97,18 +98,21 @@ import Base.Random: UUID
         n = map(String, split(names, '.'))
         pkg = Base.identify_package(n...)
         @test pkg == Base.PkgId(UUID(uuid), n[end])
-        @test Base.locate_package(pkg) == abspath("project", "deps", normpath(path))
+        p = joinpath(@__DIR__, "project", "deps", normpath(path))
+        @test p == Base.locate_package(pkg)
     end
     @test Base.identify_package("Baz") == nothing
     @test Base.identify_package("Qux") == nothing
     @testset "equivalent package names" begin
         local classes = [
-            ["Foo", "Foo.Baz.Foo", "Bar.Baz.Foo"],
-            ["Bar.Foo", "Foo.Qux.Foo"],
+            ["Foo"],
             ["Bar", "Foo.Bar"],
-            ["Foo.Baz", "Bar.Baz"],
-            ["Foo.Qux", "Bar.Foo.Qux", "Bar.Baz.Qux"],
-            ["Baz", "Qux", "Foo.Foo", "Bar.Qux", "Foo.Baz.Bar", "Foo.Qux.Bar", "Foo.Qux.Baz"],
+            ["Foo.Baz", "Bar.Baz", "Foo.Bar.Baz"],
+            ["Bar.Foo", "Foo.Bar.Foo", "Foo.Baz.Foo", "Bar.Baz.Foo"],
+            ["Foo.Qux", "Foo.Baz.Qux", "Bar.Baz.Qux", "Foo.Bar.Foo.Qux",
+             "Bar.Foo.Qux", "Foo.Baz.Foo.Qux", "Bar.Baz.Foo.Qux", "Foo.Bar.Baz.Foo.Qux"],
+            ["Baz", "Qux", "Bar.Qux", "Bar.Baz.Bar", "Bar.Foo.Bar", "Bar.Foo.Baz",
+             "Bar.Foo.Qux.Foo", "Bar.Foo.Qux.Bar", "Bar.Foo.Qux.Baz"],
         ]
         for i = 1:length(classes)
             A = classes[i]
@@ -128,6 +132,7 @@ import Base.Random: UUID
             end
         end
     end
-    empty!(LOAD_PATH)
-    append!(LOAD_PATH, saved_load_path)
 end
+
+empty!(LOAD_PATH)
+append!(LOAD_PATH, saved_load_path)

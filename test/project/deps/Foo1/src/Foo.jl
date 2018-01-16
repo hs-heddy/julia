@@ -1,5 +1,5 @@
 __precompile__(true)
 module Foo
-import Qux
+import Bar, Baz, Qux
 this = "Foo1"
 end
